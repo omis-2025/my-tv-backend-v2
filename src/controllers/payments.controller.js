@@ -1,10 +1,15 @@
-const stripe = require('../utils/stripe');
 const { prisma } = require('../config/database');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { success, error } = require('../utils/response');
 
-// Ensure or retrieve a Stripe customer for the logged-in user
+function getStripe() {
+  const stripe = require('../utils/stripe');
+  if (!stripe) throw Object.assign(new Error('Stripe is not configured on this server'), { statusCode: 503 });
+  return stripe;
+}
+
 async function getOrCreateCustomer(user) {
+  const stripe = getStripe();
   if (user.stripeCustomerId) return user.stripeCustomerId;
   const customer = await stripe.customers.create({ email: user.email, name: user.name });
   await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customer.id } });
@@ -12,6 +17,7 @@ async function getOrCreateCustomer(user) {
 }
 
 exports.createCheckoutSession = asyncHandler(async (req, res) => {
+  const stripe = getStripe();
   const { packageId } = req.body;
   const pkg = await prisma.package.findUnique({ where: { id: packageId } });
   if (!pkg || !pkg.isActive) return error(res, 'Package not found', 404);
@@ -34,6 +40,7 @@ exports.createCheckoutSession = asyncHandler(async (req, res) => {
 });
 
 exports.createPortalSession = asyncHandler(async (req, res) => {
+  const stripe = getStripe();
   if (!req.user.stripeCustomerId) return error(res, 'No billing account found', 404);
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -46,9 +53,13 @@ exports.createPortalSession = asyncHandler(async (req, res) => {
 });
 
 exports.handleWebhook = async (req, res) => {
+  let stripe;
+  try { stripe = getStripe(); } catch {
+    return res.status(503).json({ error: 'Stripe not configured' });
+  }
+
   const sig = req.headers['stripe-signature'];
   let event;
-
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
@@ -62,53 +73,29 @@ exports.handleWebhook = async (req, res) => {
         const { userId, packageId } = session.metadata;
         const pkg = await prisma.package.findUnique({ where: { id: packageId } });
         if (!pkg) break;
-
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + pkg.durationDays);
-
-        await prisma.subscription.updateMany({
-          where: { userId, status: 'ACTIVE' },
-          data: { status: 'CANCELLED' },
-        });
-
+        await prisma.subscription.updateMany({ where: { userId, status: 'ACTIVE' }, data: { status: 'CANCELLED' } });
         await prisma.subscription.create({
-          data: {
-            userId,
-            packageId,
-            status: 'ACTIVE',
-            expiresAt,
-            stripeSubscriptionId: session.subscription,
-          },
+          data: { userId, packageId, status: 'ACTIVE', expiresAt, stripeSubscriptionId: session.subscription },
         });
         break;
       }
-
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
-        await prisma.subscription.updateMany({
-          where: { stripeSubscriptionId: sub.id },
-          data: { status: 'CANCELLED' },
-        });
+        await prisma.subscription.updateMany({ where: { stripeSubscriptionId: sub.id }, data: { status: 'CANCELLED' } });
         break;
       }
-
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
-        await prisma.subscription.updateMany({
-          where: { stripeSubscriptionId: invoice.subscription },
-          data: { status: 'EXPIRED' },
-        });
+        await prisma.subscription.updateMany({ where: { stripeSubscriptionId: invoice.subscription }, data: { status: 'EXPIRED' } });
         break;
       }
-
       case 'customer.subscription.updated': {
         const sub = event.data.object;
         const status = sub.status === 'active' ? 'ACTIVE' : sub.status === 'canceled' ? 'CANCELLED' : 'EXPIRED';
         const expiresAt = new Date(sub.current_period_end * 1000);
-        await prisma.subscription.updateMany({
-          where: { stripeSubscriptionId: sub.id },
-          data: { status, expiresAt },
-        });
+        await prisma.subscription.updateMany({ where: { stripeSubscriptionId: sub.id }, data: { status, expiresAt } });
         break;
       }
     }
