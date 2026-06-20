@@ -8,5 +8,6 @@ router.use('/subscriptions', require('./subscriptions.routes'));
 router.use('/epg', require('./epg.routes'));
 router.use('/packages', require('./packages.routes'));
 router.use('/admin', require('./admin.routes'));
+router.use('/payments', require('./payments.routes'));
 
 module.exports = router;
