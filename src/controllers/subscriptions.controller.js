@@ -16,6 +16,13 @@ exports.subscribe = asyncHandler(async (req, res) => {
   const pkg = await prisma.package.findUnique({ where: { id: packageId } });
   if (!pkg || !pkg.isActive) return error(res, 'Package not found', 404);
 
+  // SECURITY: This endpoint activates a subscription WITHOUT payment, so it
+  // must ONLY be usable for free plans. Paid plans (price > 0) must go through
+  // Stripe checkout and be activated by the verified webhook only.
+  if (pkg.price > 0) {
+    return error(res, 'Paid plans require checkout. Please use the payment flow to subscribe.', 402);
+  }
+
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + pkg.durationDays);
 
@@ -53,6 +60,13 @@ exports.listAll = asyncHandler(async (req, res) => {
 
 exports.assignToUser = asyncHandler(async (req, res) => {
   const { userId, packageId, expiresAt } = req.body;
+  const [user, pkg] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    prisma.package.findUnique({ where: { id: packageId } }),
+  ]);
+  if (!user) return error(res, 'User not found', 404);
+  if (!pkg) return error(res, 'Package not found', 404);
+
   const sub = await prisma.subscription.create({
     data: { userId, packageId, expiresAt: new Date(expiresAt), status: 'ACTIVE' },
   });
@@ -60,7 +74,13 @@ exports.assignToUser = asyncHandler(async (req, res) => {
 });
 
 exports.updateSubscription = asyncHandler(async (req, res) => {
-  const sub = await prisma.subscription.update({ where: { id: req.params.id }, data: req.body });
+  // Whitelist mutable fields — never pass req.body straight to the DB.
+  const { status, expiresAt } = req.body;
+  const data = {};
+  if (status !== undefined) data.status = status;
+  if (expiresAt !== undefined) data.expiresAt = new Date(expiresAt);
+
+  const sub = await prisma.subscription.update({ where: { id: req.params.id }, data });
   success(res, { sub });
 });
 
