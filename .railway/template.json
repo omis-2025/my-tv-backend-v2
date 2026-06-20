@@ -1,0 +1,42 @@
+{
+  "services": [
+    {
+      "name": "my-tv-backend",
+      "source": {
+        "repo": "omis-2025/my-tv-backend-v2"
+      },
+      "envs": {
+        "NODE_ENV": {
+          "default": "production"
+        },
+        "PORT": {
+          "default": "5000"
+        },
+        "JWT_SECRET": {
+          "default": "change-this-to-a-long-random-secret-in-railway-dashboard"
+        },
+        "JWT_REFRESH_SECRET": {
+          "default": "change-this-to-another-long-random-secret-in-railway-dashboard"
+        },
+        "ADMIN_EMAIL": {
+          "default": "admin@mytv.com"
+        },
+        "ADMIN_PASSWORD": {
+          "default": "Admin@123"
+        },
+        "ALLOWED_ORIGINS": {
+          "default": "*"
+        },
+        "DATABASE_URL": {
+          "default": "${{Postgres.DATABASE_URL}}"
+        }
+      }
+    },
+    {
+      "name": "Postgres",
+      "source": {
+        "image": "postgres:16"
+      }
+    }
+  ]
+}
