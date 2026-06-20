@@ -15,6 +15,11 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+if (!process.env.JWT_REFRESH_SECRET) {
+  logger.error('FATAL: JWT_REFRESH_SECRET is not set');
+  process.exit(1);
+}
+
 async function bootstrap() {
   await connectDB();
   app.listen(PORT, '0.0.0.0', () => {

@@ -66,7 +66,7 @@ exports.listUsers = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, search, role } = req.query;
   const skip = (page - 1) * limit;
   const where = {
-    ...(search && { OR: [{ name: { contains: search } }, { email: { contains: search } }] }),
+    ...(search && { OR: [{ name: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }] }),
     ...(role && { role }),
   };
   const [users, total] = await Promise.all([
