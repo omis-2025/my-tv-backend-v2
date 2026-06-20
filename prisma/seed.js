@@ -22,6 +22,11 @@ async function main() {
   // Packages
   const packages = await Promise.all([
     prisma.package.upsert({
+      where: { id: 'pkg-free' },
+      update: { name: 'Free', price: 0, maxStreams: 1, features: ['50+ Free Channels', 'SD Streams'], stripePriceId: null },
+      create: { id: 'pkg-free', name: 'Free', price: 0, durationDays: 36500, maxStreams: 1, features: ['50+ Free Channels', 'SD Streams'], stripePriceId: null },
+    }),
+    prisma.package.upsert({
       where: { id: 'pkg-basic' },
       update: { stripePriceId: 'price_1TkU2ZDsA2tn7MZ4uauEEseW' },
       create: { id: 'pkg-basic', name: 'Basic', price: 4.99, durationDays: 30, maxStreams: 1, features: ['SD Streams', '500+ Channels'], stripePriceId: 'price_1TkU2ZDsA2tn7MZ4uauEEseW' },
@@ -38,6 +43,34 @@ async function main() {
     }),
   ]);
   console.log('Packages seeded:', packages.map(p => p.name));
+
+  // Channels — 60 free demo channels across categories
+  const catalog = {
+    News: ['BBC News', 'CNN International', 'Al Jazeera', 'Sky News', 'France 24', 'DW News', 'Euronews', 'CNBC', 'Bloomberg', 'CGTN'],
+    Sports: ['ESPN', 'Sky Sports', 'beIN Sports', 'Eurosport', 'NBA TV', 'Fox Sports', 'Sport TV', 'DAZN', 'Sky F1', 'Tennis Channel'],
+    Movies: ['HBO', 'Cinemax', 'Movie Hub', 'Star Movies', 'AMC', 'Paramount', 'Sony Movies', 'Film4', 'TCM', 'MGM'],
+    Entertainment: ['MTV', 'Comedy Central', 'E! Entertainment', 'TLC', 'Fox', 'AXN', 'Warner TV', 'Discovery', 'History', 'National Geographic'],
+    Kids: ['Cartoon Network', 'Nickelodeon', 'Disney Channel', 'Boomerang', 'Baby TV', 'PBS Kids', 'Nick Jr', 'Disney Junior', 'CBeebies', 'POP'],
+    Music: ['MTV Music', 'VH1', 'Vevo', 'MTV Hits', 'Kiss TV', 'Trace Urban', 'NRJ', 'Clubland TV', 'Now Music', 'The Box'],
+  };
+
+  let order = 0;
+  const ops = [];
+  for (const [category, names] of Object.entries(catalog)) {
+    for (const name of names) {
+      order += 1;
+      const id = `ch-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+      ops.push(
+        prisma.channel.upsert({
+          where: { id },
+          update: { name, category, sortOrder: order, isActive: true },
+          create: { id, name, category, country: 'INT', language: 'EN', isPremium: false, isActive: true, sortOrder: order, tags: [category] },
+        })
+      );
+    }
+  }
+  const channels = await Promise.all(ops);
+  console.log('Channels seeded:', channels.length);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 
 const plans = [
+  { name: 'Free', price: '$0', period: '/mo', channels: '50+', streams: 1, quality: 'SD', color: 'border-green-600' },
   { name: 'Basic', price: '$4.99', period: '/mo', channels: '500+', streams: 1, quality: 'SD', color: 'border-slate-600' },
   { name: 'Standard', price: '$9.99', period: '/mo', channels: '1,000+', streams: 2, quality: 'HD', color: 'border-blue-500', popular: true },
   { name: 'Premium', price: '$14.99', period: '/mo', channels: '5,000+', streams: 4, quality: '4K', color: 'border-purple-500' },
@@ -50,7 +51,7 @@ export default function LandingPage() {
       {/* Pricing */}
       <section className="py-16 px-4" id="pricing">
         <h2 className="text-4xl font-bold text-center mb-12">Simple Pricing</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((p) => (
             <div key={p.name} className={`bg-slate-800 rounded-xl p-8 border-2 ${p.color} relative`}>
               {p.popular && (
