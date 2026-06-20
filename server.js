@@ -3,7 +3,7 @@ const app = require('./src/app');
 const { logger } = require('./src/utils/logger');
 const { connectDB } = require('./src/config/database');
 
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT) || 5000;
 
 if (!process.env.DATABASE_URL) {
   logger.error('FATAL: DATABASE_URL is not set');

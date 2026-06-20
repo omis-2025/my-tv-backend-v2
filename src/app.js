@@ -26,8 +26,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
 app.use(globalRateLimiter);
 
-// Health check
+// Health check — must be before rate limiter and other middleware
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/', (_, res) => res.json({ status: 'ok', service: 'MyTV Backend API', version: '2.0.0' }));
 
 // API routes
 app.use('/api/v1', routes);
