@@ -154,3 +154,11 @@ model Watchlist {
   @@id([userId, channelId])
   @@map("watchlist")
 }
+
+model WebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@map("webhook_events")
+}
