@@ -2,6 +2,13 @@ const { prisma } = require('../config/database');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { success, error, paginated } = require('../utils/response');
 
+// Only these fields may be written from client input.
+const CHANNEL_FIELDS = ['name', 'logo', 'category', 'country', 'language', 'description', 'isPremium', 'isActive', 'sortOrder', 'tags'];
+const pick = (src, fields) => fields.reduce((acc, f) => {
+  if (src[f] !== undefined) acc[f] = src[f];
+  return acc;
+}, {});
+
 exports.listChannels = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, category, search, country } = req.query;
   const skip = (page - 1) * limit;
@@ -49,12 +56,14 @@ exports.getStreamUrl = asyncHandler(async (req, res) => {
 });
 
 exports.createChannel = asyncHandler(async (req, res) => {
-  const channel = await prisma.channel.create({ data: req.body });
+  const data = pick(req.body, CHANNEL_FIELDS);
+  const channel = await prisma.channel.create({ data });
   success(res, { channel }, 'Channel created', 201);
 });
 
 exports.updateChannel = asyncHandler(async (req, res) => {
-  const channel = await prisma.channel.update({ where: { id: req.params.id }, data: req.body });
+  const data = pick(req.body, CHANNEL_FIELDS);
+  const channel = await prisma.channel.update({ where: { id: req.params.id }, data });
   success(res, { channel });
 });
 

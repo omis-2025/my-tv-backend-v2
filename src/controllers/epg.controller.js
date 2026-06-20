@@ -2,6 +2,13 @@ const { prisma } = require('../config/database');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { success, paginated } = require('../utils/response');
 
+// Only these fields may be written from client input.
+const EPG_FIELDS = ['channelId', 'title', 'description', 'startTime', 'endTime', 'category', 'rating', 'thumbnail'];
+const pick = (src, fields) => fields.reduce((acc, f) => {
+  if (src[f] !== undefined) acc[f] = src[f];
+  return acc;
+}, {});
+
 exports.getEPG = asyncHandler(async (req, res) => {
   const { date, page = 1, limit = 100 } = req.query;
   const skip = (page - 1) * limit;
@@ -51,12 +58,12 @@ exports.syncEPG = asyncHandler(async (req, res) => {
 });
 
 exports.createEntry = asyncHandler(async (req, res) => {
-  const entry = await prisma.epgEntry.create({ data: req.body });
+  const entry = await prisma.epgEntry.create({ data: pick(req.body, EPG_FIELDS) });
   success(res, { entry }, 'EPG entry created', 201);
 });
 
 exports.updateEntry = asyncHandler(async (req, res) => {
-  const entry = await prisma.epgEntry.update({ where: { id: req.params.id }, data: req.body });
+  const entry = await prisma.epgEntry.update({ where: { id: req.params.id }, data: pick(req.body, EPG_FIELDS) });
   success(res, { entry });
 });
 
