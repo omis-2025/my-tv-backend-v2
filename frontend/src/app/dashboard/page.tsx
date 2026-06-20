@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { getUser, clearAuth } from '@/lib/auth';
@@ -10,8 +10,11 @@ interface Channel { id: string; name: string; logo?: string; category: string; i
 
 export default function DashboardPage() {
   const router = useRouter();
-  const params = useSearchParams();
   const user = getUser();
+  const [subscribed, setSubscribed] = useState(false);
+  useEffect(() => {
+    setSubscribed(new URLSearchParams(window.location.search).has('subscribed'));
+  }, []);
   const [sub, setSub] = useState<Sub | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [search, setSearch] = useState('');
@@ -45,7 +48,7 @@ export default function DashboardPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto p-8">
-        {params.get('subscribed') && (
+        {subscribed && (
           <div className="mb-6 bg-green-900/40 border border-green-700 text-green-300 rounded-lg p-4">
             🎉 Subscription activated! Welcome to MyTV.
           </div>
