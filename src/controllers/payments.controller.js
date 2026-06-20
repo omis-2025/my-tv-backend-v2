@@ -66,19 +66,45 @@ exports.handleWebhook = async (req, res) => {
     return res.status(400).json({ error: `Webhook Error: ${err.message}` });
   }
 
+  // IDEMPOTENCY: record the Stripe event id before processing. If it already
+  // exists, this is a duplicate delivery (Stripe retries) — acknowledge and skip
+  // so each event (esp. checkout.session.completed) is processed exactly once.
+  try {
+    await prisma.webhookEvent.create({ data: { id: event.id, type: event.type } });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      // Already processed — return 200 so Stripe stops retrying.
+      return res.json({ received: true, duplicate: true });
+    }
+    console.error('Webhook idempotency check failed:', err);
+    // Let Stripe retry later.
+    return res.status(500).json({ error: 'Idempotency store unavailable' });
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
-        const { userId, packageId } = session.metadata;
+        const { userId, packageId } = session.metadata || {};
+        if (!userId || !packageId) break;
         const pkg = await prisma.package.findUnique({ where: { id: packageId } });
         if (!pkg) break;
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + pkg.durationDays);
-        await prisma.subscription.updateMany({ where: { userId, status: 'ACTIVE' }, data: { status: 'CANCELLED' } });
-        await prisma.subscription.create({
-          data: { userId, packageId, status: 'ACTIVE', expiresAt, stripeSubscriptionId: session.subscription },
-        });
+
+        // Single active subscription per user + dedupe by Stripe subscription id.
+        // Wrapped in a transaction so cancel-old + activate-new are atomic.
+        await prisma.$transaction([
+          prisma.subscription.updateMany({
+            where: { userId, status: 'ACTIVE' },
+            data: { status: 'CANCELLED' },
+          }),
+          prisma.subscription.upsert({
+            where: { stripeSubscriptionId: session.subscription },
+            update: { userId, packageId, status: 'ACTIVE', expiresAt, stripePriceId: pkg.stripePriceId },
+            create: { userId, packageId, status: 'ACTIVE', expiresAt, stripeSubscriptionId: session.subscription, stripePriceId: pkg.stripePriceId },
+          }),
+        ]);
         break;
       }
       case 'customer.subscription.deleted': {
@@ -88,7 +114,9 @@ exports.handleWebhook = async (req, res) => {
       }
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
-        await prisma.subscription.updateMany({ where: { stripeSubscriptionId: invoice.subscription }, data: { status: 'EXPIRED' } });
+        if (invoice.subscription) {
+          await prisma.subscription.updateMany({ where: { stripeSubscriptionId: invoice.subscription }, data: { status: 'EXPIRED' } });
+        }
         break;
       }
       case 'customer.subscription.updated': {
@@ -101,6 +129,10 @@ exports.handleWebhook = async (req, res) => {
     }
   } catch (err) {
     console.error('Webhook handler error:', err);
+    // Processing failed AFTER we recorded the event id. Remove the marker so
+    // Stripe's retry can reprocess it, and signal failure.
+    await prisma.webhookEvent.delete({ where: { id: event.id } }).catch(() => {});
+    return res.status(500).json({ error: 'Webhook processing failed' });
   }
 
   res.json({ received: true });

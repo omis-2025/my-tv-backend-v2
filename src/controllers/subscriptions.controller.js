@@ -40,8 +40,30 @@ exports.subscribe = asyncHandler(async (req, res) => {
 });
 
 exports.cancel = asyncHandler(async (req, res) => {
-  await prisma.subscription.updateMany({
+  const active = await prisma.subscription.findFirst({
     where: { userId: req.user.id, status: 'ACTIVE' },
+  });
+  if (!active) return error(res, 'No active subscription to cancel', 404);
+
+  // If this is a paid Stripe subscription, cancel it at Stripe too so the
+  // customer is no longer billed. The webhook (customer.subscription.deleted)
+  // will then confirm the DB state. We also mark it locally for instant UX.
+  if (active.stripeSubscriptionId) {
+    const stripe = require('../utils/stripe');
+    if (stripe) {
+      try {
+        await stripe.subscriptions.cancel(active.stripeSubscriptionId);
+      } catch (err) {
+        // If Stripe says it's already gone, proceed; otherwise surface the error.
+        if (err.code !== 'resource_missing') {
+          return error(res, 'Could not cancel subscription with payment provider', 502);
+        }
+      }
+    }
+  }
+
+  await prisma.subscription.update({
+    where: { id: active.id },
     data: { status: 'CANCELLED' },
   });
   success(res, null, 'Subscription cancelled');

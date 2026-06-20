@@ -1,0 +1,7 @@
+-- CreateTable: webhook_events for Stripe idempotency
+CREATE TABLE "webhook_events" (
+    "id" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "processedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "webhook_events_pkey" PRIMARY KEY ("id")
+);
