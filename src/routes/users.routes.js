@@ -3,8 +3,13 @@ const { body } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../utils/validators');
 const usersController = require('../controllers/users.controller');
+const playlistController = require('../controllers/playlist.controller');
 
 router.use(authenticate);
+
+// IPTV M3U playlist token management
+router.get('/playlist-token', playlistController.getPlaylistToken);
+router.post('/playlist-token/rotate', playlistController.rotatePlaylistToken);
 
 router.get('/profile', usersController.getProfile);
 

@@ -7,6 +7,12 @@ router.use(authenticate);
 
 router.get('/', authorize('ADMIN', 'SUPER_ADMIN'), streamsController.listStreams);
 router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), streamsController.createStream);
+
+// Bulk admin operations (must precede /:id routes)
+router.post('/import-csv', authorize('ADMIN', 'SUPER_ADMIN'), streamsController.importCsv);
+router.post('/bulk-update', authorize('ADMIN', 'SUPER_ADMIN'), streamsController.bulkUpdate);
+router.post('/health-check', authorize('ADMIN', 'SUPER_ADMIN'), streamsController.bulkHealthCheck);
+
 router.put('/:id', authorize('ADMIN', 'SUPER_ADMIN'), streamsController.updateStream);
 router.delete('/:id', authorize('ADMIN', 'SUPER_ADMIN'), streamsController.deleteStream);
 

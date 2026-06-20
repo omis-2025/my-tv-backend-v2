@@ -9,5 +9,6 @@ router.use('/epg', require('./epg.routes'));
 router.use('/packages', require('./packages.routes'));
 router.use('/admin', require('./admin.routes'));
 router.use('/payments', require('./payments.routes'));
+router.use('/', require('./playlist.routes'));
 
 module.exports = router;

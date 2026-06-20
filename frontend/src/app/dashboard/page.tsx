@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { getUser, clearAuth } from '@/lib/auth';
+import ChannelPlayer from '@/components/ChannelPlayer';
 
 interface Sub { status: string; expiresAt: string; package: { name: string; price: number; maxStreams: number } }
 interface Channel { id: string; name: string; logo?: string; category: string; isPremium: boolean }
@@ -28,6 +29,9 @@ export default function DashboardPage() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [playing, setPlaying] = useState<Channel | null>(null);
+  const [playlistUrl, setPlaylistUrl] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setSubscribed(new URLSearchParams(window.location.search).has('subscribed'));
@@ -45,6 +49,23 @@ export default function DashboardPage() {
   }, []);
 
   function logout() { clearAuth(); router.push('/'); }
+
+  async function loadPlaylistUrl() {
+    if (playlistUrl) return;
+    try {
+      const { data } = await api.get('/users/playlist-token');
+      setPlaylistUrl(data.data.url);
+    } catch {
+      setError('Could not generate your playlist URL.');
+    }
+  }
+
+  async function copyPlaylistUrl() {
+    if (!playlistUrl) { await loadPlaylistUrl(); }
+    const url = playlistUrl || (await api.get('/users/playlist-token')).data.data.url;
+    setPlaylistUrl(url);
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  }
 
   const categories = ['All', ...Array.from(new Set(channels.map(c => c.category)))];
   const filtered = channels.filter(c => {
@@ -135,13 +156,13 @@ export default function DashboardPage() {
               ))}
             </div>
             <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <button onClick={copyPlaylistUrl} className="rounded-xl p-4 flex items-center gap-3 text-left transition-colors hover:bg-blue-500/10" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
                 <span className="text-2xl">📱</span>
                 <div>
-                  <div className="text-xs font-semibold text-blue-400">M3U Playlist</div>
-                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Use with any IPTV player</div>
+                  <div className="text-xs font-semibold text-blue-400">{copied ? '✓ Copied!' : 'M3U Playlist'}</div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{playlistUrl ? 'Tap to copy URL again' : 'Tap to copy your IPTV URL'}</div>
                 </div>
-              </div>
+              </button>
               <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
                 <span className="text-2xl">📅</span>
                 <div>
@@ -206,7 +227,9 @@ export default function DashboardPage() {
                 const color = categoryColors[ch.category] || categoryColors.Default;
                 const icon = categoryIcons[ch.category] || categoryIcons.Default;
                 return (
-                  <div key={ch.id} className="rounded-xl p-4 flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:border-blue-500/30"
+                  <div key={ch.id} onClick={() => setPlaying(ch)} role="button" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') setPlaying(ch); }}
+                    className="rounded-xl p-4 flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:border-blue-500/30"
                     style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-3 flex-shrink-0"
                       style={{ background: `${color}18` }}>
@@ -230,6 +253,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {playing && <ChannelPlayer channel={playing} onClose={() => setPlaying(null)} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ const links = [
   { href: '/admin', label: 'Dashboard', icon: '▤', exact: true },
   { href: '/admin/users', label: 'Users', icon: '👥' },
   { href: '/admin/channels', label: 'Channels', icon: '📺' },
+  { href: '/admin/streams', label: 'Streams', icon: '📡' },
   { href: '/admin/packages', label: 'Packages', icon: '📦' },
   { href: '/admin/subscriptions', label: 'Subscriptions', icon: '💳' },
 ];
